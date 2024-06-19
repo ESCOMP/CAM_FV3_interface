@@ -580,7 +580,7 @@ subroutine derived_phys_dry(phys_state, phys_tend, pbuf2d)
 ! Physics state now has CAM pdel (dry+vap) and pdeldry and all constituents are dry+vap
 ! Convert dry type constituents from moist to dry mixing ratio
 !
-     call set_wet_to_dry(phys_state(lchnk))    ! Dynamics had moist, physics wants dry.
+     call set_wet_to_dry(phys_state(lchnk), convert_cnst_type='dry')    ! Dynamics had moist, physics wants dry.
 
 !
 ! Derive the rest of the pressure variables using pdel and pdeldry
