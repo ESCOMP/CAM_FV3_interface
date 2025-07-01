@@ -135,13 +135,13 @@ subroutine dyn_readnl(nlfilename)
                         fv3_ncnst, fv3_nord, fv3_npx, fv3_npy, fv3_npz, fv3_ntiles, &
                         fv3_nwat, fv3_print_freq
 
-  real(r8)           :: fv3_beta, fv3_d2_bg, fv3_d2_bg_k1, fv3_d2_bg_k2, fv3_d4_bg, &
+  real(r8)           :: fv3_a_imp, fv3_beta, fv3_d2_bg, fv3_d2_bg_k1, fv3_d2_bg_k2, fv3_d4_bg, &
                         fv3_d_con, fv3_d_ext, fv3_dddmp, fv3_delt_max, fv3_ke_bg, &
-                        fv3_rf_cutoff, fv3_tau, fv3_vtdm4, fv3_consv_te
+                        fv3_rf_cutoff, fv3_tau, fv3_vtdm4, fv3_consv_te, fv3_p_fac
 
   logical            :: fv3_adjust_dry_mass, fv3_consv_am, fv3_do_sat_adj, fv3_do_vort_damp, &
                         fv3_dwind_2d, fv3_fill, fv3_fv_debug, fv3_fv_diag, fv3_hydrostatic, &
-                        fv3_make_nh, fv3_no_dycore, fv3_range_warn, fv3_external_eta
+                        fv3_make_nh, fv3_no_dycore, fv3_range_warn, fv3_external_eta, fv3_use_logp
 
   ! fms_nml namelist variables - these namelist variables defined in fv3 library without fv3_
 
@@ -173,7 +173,7 @@ subroutine dyn_readnl(nlfilename)
        fv3_npes
 
   namelist /fv_core_nml/          &
-       fv3_adjust_dry_mass,fv3_beta,fv3_consv_am,fv3_consv_te,fv3_d2_bg, &
+       fv3_adjust_dry_mass,fv3_a_imp,fv3_beta,fv3_consv_am,fv3_consv_te,fv3_d2_bg, &
        fv3_d2_bg_k1,fv3_d2_bg_k2,fv3_d4_bg,fv3_d_con,fv3_d_ext,fv3_dddmp, &
        fv3_delt_max,fv3_dnats,fv3_do_sat_adj,fv3_do_vort_damp,fv3_dwind_2d, &
        fv3_fill,fv3_fv_debug,fv3_fv_diag,fv3_fv_sg_adj,fv3_grid_type, &
@@ -181,9 +181,9 @@ subroutine dyn_readnl(nlfilename)
        fv3_hydrostatic,fv3_io_layout,fv3_k_split,fv3_q_split,fv3_ke_bg,fv3_kord_mt, &
        fv3_kord_tm,fv3_kord_tr,fv3_kord_wz,fv3_layout,fv3_make_nh, &
        fv3_n_split,fv3_n_sponge,fv3_na_init,fv3_ncnst,fv3_no_dycore, &
-       fv3_nord,fv3_npx,fv3_npy,fv3_npz,fv3_ntiles,fv3_nwat, &
+       fv3_nord,fv3_npx,fv3_npy,fv3_npz,fv3_ntiles,fv3_nwat,fv3_p_fac, &
        fv3_print_freq,fv3_range_warn,fv3_rf_cutoff,fv3_tau, &
-       fv3_vtdm4, fv3_external_eta
+       fv3_use_logp,fv3_vtdm4,fv3_external_eta
   !--------------------------------------------------------------------------
 
   ! defaults for namelist variables not set by build-namelist
@@ -237,8 +237,9 @@ subroutine dyn_readnl(nlfilename)
   end if
 
   ! Non-hydrostatic runs not currently supported
-  if (.not.fv3_hydrostatic) &
-       call endrun('dyn_readnl: ERROR FV3 Non-hydrostatic option is not supported, set namelist fv3_hydrostatic = .true.')
+  ! Well, we're going to do it anyway!
+  !if (.not.fv3_hydrostatic) &
+  !     call endrun('dyn_readnl: ERROR FV3 Non-hydrostatic option is not supported, set namelist fv3_hydrostatic = .true.')
 
   !
   ! write fv3 dycore namelist options to log
@@ -246,6 +247,7 @@ subroutine dyn_readnl(nlfilename)
   if (masterproc) then
      write (iulog,*) 'FV3 dycore Options: '
      write (iulog,*) '  fv3_adjust_dry_mass       = ',fv3_adjust_dry_mass
+     write (iulog,*) '  fv3_a_imp                 = ',fv3_a_imp
      write (iulog,*) '  fv3_beta                  = ',fv3_beta
      write (iulog,*) '  fv3_clock_grain           = ',trim(fv3_clock_grain)
      write (iulog,*) '  fv3_consv_am              = ',fv3_consv_am
@@ -297,6 +299,7 @@ subroutine dyn_readnl(nlfilename)
      write (iulog,*) '  fv3_npz                   = ',fv3_npz
      write (iulog,*) '  fv3_ntiles                = ',fv3_ntiles
      write (iulog,*) '  fv3_nwat                  = ',fv3_nwat
+     write (iulog,*) '  fv3_p_fac                 = ',fv3_p_fac
      write (iulog,*) '  fv3_print_freq            = ',fv3_print_freq
      write (iulog,*) '  fv3_domains_stack_size    = ',fv3_domains_stack_size
      write (iulog,*) '  fv3_range_warn            = ',fv3_range_warn
@@ -304,6 +307,7 @@ subroutine dyn_readnl(nlfilename)
      write (iulog,*) '  fv3_scale_ttend           = ',fv3_scale_ttend
      write (iulog,*) '  fv3_stack_size            = ',fv3_stack_size
      write (iulog,*) '  fv3_tau                   = ',fv3_tau
+     write (iulog,*) '  fv3_use_logp              = ',fv3_use_logp
      write (iulog,*) '  fv3_vtdm4                 = ',fv3_vtdm4
   end if
 
@@ -1088,6 +1092,20 @@ subroutine read_inidat(dyn_in)
         end do
      end do
 
+     dbuf3=0._r8
+     if (.not. Atm(mytile)%flagstruct%hydrostatic) then
+         call analytic_ic_set_ic(vcoord, latvals_rad, lonvals_rad, glob_ind,            &
+               W=dbuf3(:,:,:))
+         n=0
+         do j = js, je
+            do i = is, ie
+               ! W. This can be nonzero for nonhydrostatic models
+               n=n+1
+               atm(mytile)%w(i,j,:) = dbuf3(n, :, 1)
+            end do
+         end do
+     end if
+
      call analytic_ic_set_ic(vcoord, latvals_rad, lonvals_rad, glob_ind,            &
           Q=dbuf4(:,:,:,1:pcnst), m_cnst=m_ind)
 
@@ -1394,6 +1412,7 @@ subroutine read_inidat(dyn_in)
            enddo
         enddo
      enddo
+     call mpp_update_domains( atm(mytile)%w,    Atm(mytile)%domain )
   end if
 
   ! once we've read or initialized all the fields we call update_domains to
